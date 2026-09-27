@@ -1,25 +1,24 @@
 import { Events } from 'discord.js';
 import { logger } from '../utils/logger.js';
-
-const BOOSTER_ROLE_ID = process.env.BOOSTER_ROLE_ID;
+import { getGuildConfig } from '../services/config/guildConfig.js';
 
 export default {
   name: Events.GuildMemberUpdate,
-  async execute(oldMember, newMember) {
-    if (!BOOSTER_ROLE_ID) return;
-
+  async execute(oldMember, newMember, client) {
     const startedBoosting = !oldMember.premiumSince && Boolean(newMember.premiumSince);
     const stoppedBoosting = Boolean(oldMember.premiumSince) && !newMember.premiumSince;
-
     if (!startedBoosting && !stoppedBoosting) return;
 
-    const role = newMember.guild.roles.cache.get(BOOSTER_ROLE_ID);
-    if (!role) {
-      logger.warn(`Booster role ${BOOSTER_ROLE_ID} was not found in guild ${newMember.guild.id}`);
-      return;
-    }
-
     try {
+      const config = await getGuildConfig(client, newMember.guild.id);
+      if (!config.boosterRoleEnabled || !config.boosterRoleId) return;
+
+      const role = newMember.guild.roles.cache.get(config.boosterRoleId);
+      if (!role) {
+        logger.warn(`Booster role ${config.boosterRoleId} was not found in guild ${newMember.guild.id}`);
+        return;
+      }
+
       if (startedBoosting && !newMember.roles.cache.has(role.id)) {
         await newMember.roles.add(role, 'Automatically assigned for boosting the server');
         logger.info(`Assigned booster role to ${newMember.user.tag} in ${newMember.guild.id}`);
